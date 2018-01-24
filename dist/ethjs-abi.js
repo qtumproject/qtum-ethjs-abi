@@ -12,41 +12,41 @@
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
-
+/******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
-
+/******/
 /******/ 		// Check if module is in cache
 /******/ 		if(installedModules[moduleId])
 /******/ 			return installedModules[moduleId].exports;
-
+/******/
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = installedModules[moduleId] = {
 /******/ 			i: moduleId,
 /******/ 			l: false,
 /******/ 			exports: {}
 /******/ 		};
-
+/******/
 /******/ 		// Execute the module function
 /******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-
+/******/
 /******/ 		// Flag the module as loaded
 /******/ 		module.l = true;
-
+/******/
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-
-
+/******/
+/******/
 /******/ 	// expose the modules object (__webpack_modules__)
 /******/ 	__webpack_require__.m = modules;
-
+/******/
 /******/ 	// expose the module cache
 /******/ 	__webpack_require__.c = installedModules;
-
+/******/
 /******/ 	// identity function for calling harmory imports with the correct context
 /******/ 	__webpack_require__.i = function(value) { return value; };
-
+/******/
 /******/ 	// define getter function for harmory exports
 /******/ 	__webpack_require__.d = function(exports, name, getter) {
 /******/ 		Object.defineProperty(exports, name, {
@@ -55,13 +55,13 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 			get: getter
 /******/ 		});
 /******/ 	};
-
+/******/
 /******/ 	// Object.prototype.hasOwnProperty.call
 /******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
-
+/******/
 /******/ 	// __webpack_public_path__
 /******/ 	__webpack_require__.p = "";
-
+/******/
 /******/ 	// Load entry module and return exports
 /******/ 	return __webpack_require__(__webpack_require__.s = 4);
 /******/ })
@@ -5329,6 +5329,14 @@ module.exports = g;
 "use strict";
 /* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
+/*
+Primary Attribution
+Richard Moore <ricmoo@me.com>
+https://github.com/ethers-io
+
+Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
+*/
+
 var BN = __webpack_require__(1);
 var numberToBN = __webpack_require__(10);
 var keccak256 = __webpack_require__(9).keccak_256;
@@ -5753,7 +5761,20 @@ module.exports = {
 "use strict";
 /* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
 
+function _classCallCheck(instance, Constructor) {
+  if (!(instance instanceof Constructor)) {
+    throw new TypeError("Cannot call a class as a function");
+  }
+}
+
 /* eslint-disable */
+/*
+Primary Attribution
+Richard Moore <ricmoo@me.com>
+https://github.com/ethers-io
+
+Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
+*/
 
 var utils = __webpack_require__(3);
 var uint256Coder = utils.uint256Coder;
@@ -5766,7 +5787,47 @@ var coderArray = utils.coderArray;
 var paramTypePart = utils.paramTypePart;
 var getParamCoder = utils.getParamCoder;
 
-function Result() {}
+// function Result() { }
+
+var Result = function () {
+  function Result() {
+    var size = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : undefined;
+
+    _classCallCheck(this, Result);
+
+    if (size) {
+      Object.defineProperty(this, "length", {
+        value: size
+      });
+    }
+  }
+
+  // Implements iterator protocol for array-like destructuring and for..of loop.
+
+
+  Result.prototype[Symbol.iterator] = function () {
+    var _this = this;
+
+    var size = this.length || 0;
+
+    var i = 0;
+    return {
+      next: function next() {
+        var done = i > size - 1;
+        var v = {
+          value: !done ? _this[i] : undefined,
+          done: done
+        };
+
+        i++;
+
+        return v;
+      }
+    };
+  };
+
+  return Result;
+}();
 
 function encodeParams(types, values) {
   if (types.length !== values.length) {
@@ -5818,6 +5879,7 @@ function encodeParams(types, values) {
 // decode bytecode data from output names and types
 function decodeParams(names, types, data) {
   var useNumberedParams = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : true;
+  var values = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : new Result();
 
   // Names is optional, so shift over all the parameters if not provided
   if (arguments.length < 3) {
@@ -5827,7 +5889,6 @@ function decodeParams(names, types, data) {
   }
 
   data = utils.hexOrBuffer(data);
-  var values = new Result();
 
   var offset = 0;
   types.forEach(function (type, index) {
@@ -5896,18 +5957,31 @@ function decodeEvent(eventObject, data, topics) {
   });
   var nonIndexedNames = utils.getKeys(nonIndexed, 'name', true);
   var nonIndexedTypes = utils.getKeys(nonIndexed, 'type');
-  var event = decodeParams(nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), useNumberedParams);
+  var event = decodeParams(nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), false, new Result(eventObject.inputs.length));
   var topicOffset = eventObject.anonymous ? 0 : 1;
 
-  eventObject.inputs.filter(function (input) {
-    return input.indexed;
-  }).map(function (input, i) {
-    var topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
-    var coder = getParamCoder(input.type);
-    event[input.name] = coder.decode(topic, 0).value;
+  eventObject.inputs.map(function (input, i) {
+    // FIXME: special handling for string and bytes
+
+    if (input.indexed) {
+      var topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
+      var coder = getParamCoder(input.type);
+      event[input.name] = coder.decode(topic, 0).value;
+    }
+
+    if (useNumberedParams) {
+      // console.log("define", i, )
+      Object.defineProperty(event, i, {
+        enumerable: false,
+        value: event[input.name]
+      });
+    }
   });
 
-  event._eventName = eventObject.name;
+  event.type = eventObject.name;
+  // Object.defineProperty(event, 0, {
+  //   value: event.type,
+  // })
 
   return event;
 }
@@ -5996,22 +6070,22 @@ function placeHoldersCount (b64) {
 
 function byteLength (b64) {
   // base64 is 4/3 + up to two characters of the original data
-  return b64.length * 3 / 4 - placeHoldersCount(b64)
+  return (b64.length * 3 / 4) - placeHoldersCount(b64)
 }
 
 function toByteArray (b64) {
-  var i, j, l, tmp, placeHolders, arr
+  var i, l, tmp, placeHolders, arr
   var len = b64.length
   placeHolders = placeHoldersCount(b64)
 
-  arr = new Arr(len * 3 / 4 - placeHolders)
+  arr = new Arr((len * 3 / 4) - placeHolders)
 
   // if there are placeholders, only get up to the last complete 4 chars
   l = placeHolders > 0 ? len - 4 : len
 
   var L = 0
 
-  for (i = 0, j = 0; i < l; i += 4, j += 3) {
+  for (i = 0; i < l; i += 4) {
     tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
     arr[L++] = (tmp >> 16) & 0xFF
     arr[L++] = (tmp >> 8) & 0xFF
@@ -6893,6 +6967,10 @@ process.off = noop;
 process.removeListener = noop;
 process.removeAllListeners = noop;
 process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
 
 process.binding = function (name) {
     throw new Error('process.binding is not supported');
