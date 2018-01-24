@@ -5,7 +5,7 @@ const BN = require('bn.js');
 
 describe('test basic encoding and decoding functionality', () => {
   const interfaceABI = [
-  {'constant':false,'inputs':[{'name':'_value','type':'uint256'}],'name':'set','outputs':[{'name':'','type':'bool'}],'payable':false,'type':'function'}, {'constant':false,'inputs':[],'name':'get','outputs':[{'name':'storeValue','type':'uint256'}],'payable':false,'type':'function'}, {'anonymous':false,'inputs':[{'indexed':false,'name':'_newValue','type':'uint256'},{'indexed':false,'name':'_sender','type':'address'}],'name':'SetComplete','type':'event'}]; // eslint-disable-line
+    { 'constant': false, 'inputs': [{ 'name': '_value', 'type': 'uint256' }], 'name': 'set', 'outputs': [{ 'name': '', 'type': 'bool' }], 'payable': false, 'type': 'function' }, { 'constant': false, 'inputs': [], 'name': 'get', 'outputs': [{ 'name': 'storeValue', 'type': 'uint256' }], 'payable': false, 'type': 'function' }, { 'anonymous': false, 'inputs': [{ 'indexed': false, 'name': '_newValue', 'type': 'uint256' }, { 'indexed': false, 'name': '_sender', 'type': 'address' }], 'name': 'SetComplete', 'type': 'event' }]; // eslint-disable-line
   it('should encode and decode contract data nicely', () => {
     const BalanceClaimInterface = JSON.parse(contracts.BalanceClaim.interface);
     const encodeBalanceClaimMethod1 = abi.encodeMethod(BalanceClaimInterface[0], []);
@@ -19,10 +19,10 @@ describe('test basic encoding and decoding functionality', () => {
 
     abi.encodeEvent(interfaceABI[2], [24000, '0xca35b7d915458ef540ade6068dfe2f44e8fa733c']);
     const event = abi.decodeEvent(interfaceABI[2], '0x0000000000000000000000000000000000000000000000000000000000000d7d000000000000000000000000ca35b7d915458ef540ade6068dfe2f44e8fa733c');
+    assert.deepEqual(event[0], new BN(3453));
+    assert.deepEqual(event[1], '0xca35b7d915458ef540ade6068dfe2f44e8fa733c');
     assert.deepEqual(event, {
-      0: new BN(3453),
-      1: '0xca35b7d915458ef540ade6068dfe2f44e8fa733c',
-      _eventName: 'SetComplete',
+      type: 'SetComplete',
       _newValue: new BN(3453),
       _sender: '0xca35b7d915458ef540ade6068dfe2f44e8fa733c',
     });
@@ -57,11 +57,27 @@ describe('test basic encoding and decoding functionality', () => {
     }];
 
     const decoded = abi.decodeEvent(eventAbi, logs[0].data, logs[0].topics);
+
+    // Allow array-like access to log parameters
+    const [
+      userKey,
+      proxy,
+      controller,
+      recoveryKey,
+    ] = decoded;
+
+    assert.deepEqual([
+      userKey,
+      proxy,
+      controller,
+      recoveryKey],
+      ['0x50858f2c7873fac9398ed9c195d185089caa7967',
+        '0x0aa622ec7d114c8a18730a9a6147ffbded11cefa',
+        '0xcec030978d9e5e8b4ad689b1f509f8e9617efbe3',
+        '0x41f50a40900dc9ac8a6d4cfb4fa5e05ed428de42']);
+
     assert.deepEqual(decoded, {
-      0: '0x0aa622ec7d114c8a18730a9a6147ffbded11cefa',
-      1: '0xcec030978d9e5e8b4ad689b1f509f8e9617efbe3',
-      2: '0x41f50a40900dc9ac8a6d4cfb4fa5e05ed428de42',
-      _eventName: 'IdentityCreated',
+      type: 'IdentityCreated',
       userKey: '0x50858f2c7873fac9398ed9c195d185089caa7967',
       proxy: '0x0aa622ec7d114c8a18730a9a6147ffbded11cefa',
       controller: '0xcec030978d9e5e8b4ad689b1f509f8e9617efbe3',
@@ -69,7 +85,7 @@ describe('test basic encoding and decoding functionality', () => {
     });
 
     assert.deepEqual(abi.decodeLogItem(eventAbi, logs[0], false), {
-      _eventName: 'IdentityCreated',
+      type: 'IdentityCreated',
       userKey: '0x50858f2c7873fac9398ed9c195d185089caa7967',
       proxy: '0x0aa622ec7d114c8a18730a9a6147ffbded11cefa',
       controller: '0xcec030978d9e5e8b4ad689b1f509f8e9617efbe3',
@@ -79,7 +95,7 @@ describe('test basic encoding and decoding functionality', () => {
     const decode = abi.logDecoder([eventAbi].concat(interfaceABI), false);
 
     assert.deepEqual(decode(logs), [{
-      _eventName: 'IdentityCreated',
+      type: 'IdentityCreated',
       userKey: '0x50858f2c7873fac9398ed9c195d185089caa7967',
       proxy: '0x0aa622ec7d114c8a18730a9a6147ffbded11cefa',
       controller: '0xcec030978d9e5e8b4ad689b1f509f8e9617efbe3',

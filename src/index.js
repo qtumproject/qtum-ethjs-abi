@@ -18,7 +18,36 @@ const coderArray = utils.coderArray;
 const paramTypePart = utils.paramTypePart;
 const getParamCoder = utils.getParamCoder;
 
-function Result() {}
+// function Result() { }
+class Result {
+  constructor(size = undefined) {
+    if (size) {
+      Object.defineProperty(this, "length", {
+        value: size
+      })
+    }
+  }
+
+  // Implements iterator protocol for array-like destructuring and for..of loop.
+  [Symbol.iterator]() {
+    const size = this.length || 0
+
+    let i = 0
+    return {
+      next: () => {
+        const done = i > size - 1
+        const v = {
+          value: !done ? this[i] : undefined,
+          done,
+        }
+
+        i++
+
+        return v
+      }
+    }
+  }
+}
 
 function encodeParams(types, values) {
   if (types.length !== values.length) {
@@ -27,9 +56,9 @@ function encodeParams(types, values) {
 
   var parts = [];
 
-  types.forEach(function(type, index) {
+  types.forEach(function (type, index) {
     var coder = getParamCoder(type);
-    parts.push({dynamic: coder.dynamic, value: coder.encode(values[index])});
+    parts.push({ dynamic: coder.dynamic, value: coder.encode(values[index]) });
   });
 
   function alignSize(size) {
@@ -37,7 +66,7 @@ function encodeParams(types, values) {
   }
 
   var staticSize = 0, dynamicSize = 0;
-  parts.forEach(function(part) {
+  parts.forEach(function (part) {
     if (part.dynamic) {
       staticSize += 32;
       dynamicSize += alignSize(part.value.length);
@@ -49,7 +78,7 @@ function encodeParams(types, values) {
   var offset = 0, dynamicOffset = staticSize;
   var data = new Buffer(staticSize + dynamicSize);
 
-  parts.forEach(function(part, index) {
+  parts.forEach(function (part, index) {
     if (part.dynamic) {
       uint256Coder.encode(dynamicOffset).copy(data, offset);
       offset += 32;
@@ -66,7 +95,7 @@ function encodeParams(types, values) {
 }
 
 // decode bytecode data from output names and types
-function decodeParams(names, types, data, useNumberedParams = true) {
+function decodeParams(names, types, data, useNumberedParams = true, values = new Result()) {
   // Names is optional, so shift over all the parameters if not provided
   if (arguments.length < 3) {
     data = types;
@@ -75,10 +104,9 @@ function decodeParams(names, types, data, useNumberedParams = true) {
   }
 
   data = utils.hexOrBuffer(data);
-  var values = new Result();
 
   var offset = 0;
-  types.forEach(function(type, index) {
+  types.forEach(function (type, index) {
     var coder = getParamCoder(type);
 
     if (coder.dynamic) {
@@ -140,16 +168,34 @@ function decodeEvent(eventObject, data, topics, useNumberedParams = true) {
   const nonIndexed = eventObject.inputs.filter((input) => !input.indexed)
   const nonIndexedNames = utils.getKeys(nonIndexed, 'name', true);
   const nonIndexedTypes = utils.getKeys(nonIndexed, 'type');
-  const event = decodeParams(nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), useNumberedParams);
+  const event = decodeParams(
+    nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), false,
+    new Result(eventObject.inputs.length)
+  );
   const topicOffset = eventObject.anonymous ? 0 : 1;
 
-  eventObject.inputs.filter((input) => input.indexed).map((input, i) => {
-    const topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
-    const coder = getParamCoder(input.type);
-    event[input.name] = coder.decode(topic, 0).value;
+  eventObject.inputs.map((input, i) => {
+    // FIXME: special handling for string and bytes
+
+    if (input.indexed) {
+      const topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
+      const coder = getParamCoder(input.type);
+      event[input.name] = coder.decode(topic, 0).value;
+    }
+
+    if (useNumberedParams) {
+      // console.log("define", i, )
+      Object.defineProperty(event, i, {
+        enumerable: false,
+        value: event[input.name],
+      });
+    }
   });
 
-  event._eventName = eventObject.name;
+  event.type = eventObject.name;
+  // Object.defineProperty(event, 0, {
+  //   value: event.type,
+  // })
 
   return event;
 }
@@ -169,7 +215,7 @@ function logDecoder(abi, useNumberedParams = true) {
   abi.filter(item => item.type === 'event').map(item => {
     eventMap[eventSignature(item)] = item
   })
-  return function(logItems) {
+  return function (logItems) {
     return logItems.map(log => decodeLogItem(eventMap[log.topics[0]], log, useNumberedParams)).filter(i => i)
   }
 }
