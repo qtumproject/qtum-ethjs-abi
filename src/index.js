@@ -9,7 +9,6 @@ Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 
 const Buffer = require('buffer').Buffer;
 const utils = require('./utils/index.js');
-const hexStringToBuffer = utils.hexStringToBuffer
 const uint256Coder = utils.uint256Coder;
 const coderBoolean = utils.coderBoolean;
 const coderFixedBytes = utils.coderFixedBytes;
@@ -20,44 +19,12 @@ const coderArray = utils.coderArray;
 const paramTypePart = utils.paramTypePart;
 const getParamCoder = utils.getParamCoder;
 
-/**
- * Convert Buffer to hex string
- * @param {(Buffer | string)} data
- * @returns {string} data in hexadecimal string
- */
-function toHexStringNoPrefix(data) {
-  if (typeof data === "string") {
-    return data;
-  } else {
-    return data.toString('hex');
-  }
-}
-
-/**
- * Convert Buffer to hex string
- * @param {(Buffer | string)} data
- * @returns {string} data in hexadecimal string
- */
-function toHexStringPrefixed(data) {
-  if (typeof data === "string") {
-    return '0x' + data;
-  } else {
-    return '0x' + data.toString('hex');
-  }
-}
-
-let hexstr = toHexStringPrefixed;
-
-/**
- *
- * @param {Object} opts ABI encoding options
- * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
- */
-function configure(opts) {
-  if (opts.noHexStringPrefix) {
-    hexstr = toHexStringNoPrefix;
-  }
-}
+const {
+  hexStringToBuffer,
+  toHexStringNoPrefix,
+  toHexString,
+  configure,
+} = utils
 
 // function Result() { }
 class Result {
@@ -139,7 +106,7 @@ function encodeParams(types, values, noHexPrefix = false) {
   if (noHexPrefix) {
     return toHexStringNoPrefix(data);
   } else {
-    return hexstr(data);
+    return toHexString(data);
   }
 }
 
@@ -160,8 +127,6 @@ function decodeParams(names, types, data, useNumberedParams = true, values = new
     types = names;
     names = [];
   }
-
-  console.log(types, data.toString("hex"));
 
   data = utils.hexOrBuffer(data);
 
@@ -194,7 +159,7 @@ function encodeSignature(method) {
   const signature = `${method.name}(${utils.getKeys(method.inputs, 'type').join(',')})`;
   const signatureEncoded = utils.keccak256(signature).slice(0, 8)
 
-  return hexstr(signatureEncoded);
+  return toHexString(signatureEncoded);
 }
 
 // encode method ABI object with values in an array, output bytecode
@@ -220,7 +185,7 @@ function encodeEvent(eventObject, values) {
 function eventSignature(eventObject) {
   const signature = `${eventObject.name}(${utils.getKeys(eventObject.inputs, 'type').join(',')})`;
 
-  return hexstr(utils.keccak256(signature));
+  return toHexString(utils.keccak256(signature));
 }
 
 // decode method data bytecode, from method ABI object

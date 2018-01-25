@@ -11,6 +11,59 @@ const BN = require('bn.js');
 const numberToBN = require('number-to-bn');
 const keccak256 = require('js-sha3').keccak_256;
 
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringNoPrefix(data) {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  return data.toString('hex');
+}
+
+/**
+ * Convert Buffer to hex string, prefixed with `0x`
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringPrefixed(data) {
+  if (typeof data === 'string') {
+    return `0x${data}`;
+  }
+
+  return `0x${data.toString('hex')}`;
+}
+
+let noHexStringPrefix = false;
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexString(data) {
+  if (noHexStringPrefix) {
+    return toHexStringNoPrefix(data);
+  }
+
+  return toHexStringPrefixed(data);
+}
+
+
+
+/**
+ *
+ * @param {Object} opts ABI encoding options
+ * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
+ */
+function configure(opts) {
+  if (opts.noHexStringPrefix) {
+    noHexStringPrefix = toHexStringNoPrefix;
+  }
+}
+
 // from ethereumjs-util
 function stripZeros(aInput) {
   var a = aInput; // eslint-disable-line
@@ -181,7 +234,7 @@ function coderFixedBytes(length) {
 
       return {
         consumed: 32,
-        value: `0x${data.slice(offset, offset + length).toString('hex')}`,
+        value: toHexString(data.slice(offset, offset + length)),
       };
     },
   };
@@ -199,13 +252,13 @@ const coderAddress = {
     if (data.length === 0) {
       return {
         consumed: 32,
-        value: '0x',
+        value: toHexString(new Buffer('')),
       };
     }
     if (data.length !== 0 && data.length < offset + 32) { throw new Error(`[ethjs-abi] while decoding address data, invalid address data, invalid byte length ${data.length}`); }
     return {
       consumed: 32,
-      value: `0x${data.slice(offset + 12, offset + 32).toString('hex')}`,
+      value: toHexString(data.slice(offset + 12, offset + 32).toString('hex')),
     };
   },
 };
@@ -241,7 +294,7 @@ const coderDynamicBytes = {
   },
   decode: function decodeDynamicBytes(data, offset) {
     var result = decodeDynamicBytesHelper(data, offset); // eslint-disable-line
-    result.value = `0x${result.value.toString('hex')}`;
+    result.value = toHexString(result.value);
     return result;
   },
   dynamic: true,
@@ -415,4 +468,8 @@ module.exports = {
   coderArray,
   paramTypePart,
   getParamCoder,
+  configure,
+  toHexStringNoPrefix,
+  toHexStringPrefixed,
+  toHexString,
 };
