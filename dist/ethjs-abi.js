@@ -5327,7 +5327,7 @@ module.exports = g;
 /***/ function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
+'use strict';
 
 /*
 Primary Attribution
@@ -5337,6 +5337,7 @@ https://github.com/ethers-io
 Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 */
 
+var Buffer = __webpack_require__(0).Buffer;
 var BN = __webpack_require__(1);
 var numberToBN = __webpack_require__(10);
 var keccak256 = __webpack_require__(9).keccak_256;
@@ -5361,31 +5362,57 @@ function bnToBuffer(bnInput) {
   return stripZeros(new Buffer(hex, 'hex'));
 }
 
-function isHexString(value, length) {
-  if (typeof value !== 'string' || !value.match(/^0x[0-9A-Fa-f]*$/)) {
-    return false;
-  }
-  if (length && value.length !== 2 + 2 * length) {
-    return false;
-  }
-  return true;
+/**
+ * Check if a string is hexadecimal data
+ *
+ * @param {string} value
+ * @param {number} size
+ */
+function isHexString(value, size) {
+  return hexStringToBuffer(value).length === size;
 }
 
-function hexOrBuffer(valueInput, name) {
-  var value = valueInput; // eslint-disable-line
-  if (!Buffer.isBuffer(value)) {
-    if (!isHexString(value)) {
-      var error = new Error(name ? '[ethjs-abi] invalid ' + name : '[ethjs-abi] invalid hex or buffer, must be a prefixed alphanumeric even length hex string');
-      error.reason = '[ethjs-abi] invalid hex string, hex must be prefixed and alphanumeric (e.g. 0x023..)';
-      error.value = value;
-      throw error;
-    }
+/**
+ * Convert hexadecimal string to a buffer. The '0x' prefix is optional.
+ * @param {string} value
+ * @param {number} size The expected buffer size
+ * @param {string} msg optional error message
+ */
+function hexStringToBuffer(value) {
+  var size = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+  var msg = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
 
-    value = value.substring(2);
-    if (value.length % 2) {
-      value = '0' + value;
-    }
-    value = new Buffer(value, 'hex');
+  if (typeof value !== 'string' || !value.match(/^(0x)?[0-9A-Fa-f]*$/)) {
+    var err = new Error(msg || '[ethjs-abi] invalid hex string');
+    err.value = value;
+    throw err;
+  }
+
+  // massage the hex string before conversion to Buffer
+  var data = value;
+  if (data[0] === '0' && data[1] === 'x') {
+    data = data.slice(2);
+  }
+
+  if (data.length % 2 !== 0) {
+    data = '0' + data;
+  }
+
+  if (size && data.length !== size * 2) {
+    throw new Error(msg || '[ethjs-abi] Expects a ' + size + ' bytes hex string');
+  }
+
+  return new Buffer(data, 'hex');
+}
+
+/**
+ * Convert string to Buffer
+ * @param {(Buffer|string)} valueInput
+ * @returns {Buffer}
+ */
+function hexOrBuffer(value) {
+  if (typeof value === 'string') {
+    return hexStringToBuffer(value);
   }
 
   return value;
@@ -5503,13 +5530,9 @@ function coderFixedBytes(length) {
 }
 
 var coderAddress = {
-  encode: function encodeAddress(valueInput) {
-    var value = valueInput; // eslint-disable-line
-    var result = new Buffer(32); // eslint-disable-line
-    if (!isHexString(value, 20)) {
-      throw new Error('[ethjs-abi] while encoding address, invalid address value, not alphanumeric 20 byte hex string');
-    }
-    value = hexOrBuffer(value);
+  encode: function encodeAddress(input) {
+    var result = new Buffer(32);
+    var value = hexStringToBuffer(input, 20, '[ethjs-abi] while encoding invalid address; not alphanumeric 20 byte hex string');
     result.fill(0);
     value.copy(result, 12);
     return result;
@@ -5644,6 +5667,10 @@ function coderArray(coder, lengthInput) {
 // build the coder up from its parts
 var paramTypePart = new RegExp(/^((u?int|bytes)([0-9]*)|(address|bool|string)|(\[([0-9]*)\]))/);
 
+/**
+ *
+ * @param {string} typeInput
+ */
 function getParamCoder(typeInput) {
   var type = typeInput; // eslint-disable-line
   var coder = null; // eslint-disable-line
@@ -5736,6 +5763,7 @@ module.exports = {
   hexOrBuffer: hexOrBuffer,
   hexlify: hexlify,
   stripZeros: stripZeros,
+  hexStringToBuffer: hexStringToBuffer,
 
   keccak256: keccak256,
 
@@ -5752,14 +5780,13 @@ module.exports = {
   paramTypePart: paramTypePart,
   getParamCoder: getParamCoder
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ },
 /* 4 */
 /***/ function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(Buffer) {'use strict';
+'use strict';
 
 function _classCallCheck(instance, Constructor) {
   if (!(instance instanceof Constructor)) {
@@ -5776,7 +5803,9 @@ https://github.com/ethers-io
 Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 */
 
+var Buffer = __webpack_require__(0).Buffer;
 var utils = __webpack_require__(3);
+var hexStringToBuffer = utils.hexStringToBuffer;
 var uint256Coder = utils.uint256Coder;
 var coderBoolean = utils.coderBoolean;
 var coderFixedBytes = utils.coderFixedBytes;
@@ -5786,6 +5815,45 @@ var coderString = utils.coderString;
 var coderArray = utils.coderArray;
 var paramTypePart = utils.paramTypePart;
 var getParamCoder = utils.getParamCoder;
+
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringNoPrefix(data) {
+  if (typeof data === "string") {
+    return data;
+  } else {
+    return data.toString('hex');
+  }
+}
+
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringPrefixed(data) {
+  if (typeof data === "string") {
+    return '0x' + data;
+  } else {
+    return '0x' + data.toString('hex');
+  }
+}
+
+var hexstr = toHexStringPrefixed;
+
+/**
+ *
+ * @param {Object} opts ABI encoding options
+ * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
+ */
+function configure(opts) {
+  if (opts.noHexStringPrefix) {
+    hexstr = toHexStringNoPrefix;
+  }
+}
 
 // function Result() { }
 
@@ -5829,7 +5897,14 @@ var Result = function () {
   return Result;
 }();
 
+/**
+ * @param {Array<string>} types
+ * @param {any[]} values
+ */
+
 function encodeParams(types, values) {
+  var noHexPrefix = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+
   if (types.length !== values.length) {
     throw new Error('[ethjs-abi] while encoding params, types/values mismatch, Your contract requires ' + types.length + ' types (arguments), and you passed in ' + values.length);
   }
@@ -5873,10 +5948,23 @@ function encodeParams(types, values) {
     }
   });
 
-  return '0x' + data.toString('hex');
+  if (noHexPrefix) {
+    return toHexStringNoPrefix(data);
+  } else {
+    return hexstr(data);
+  }
 }
 
-// decode bytecode data from output names and types
+/**
+ * Decode bytecode data from output names and types
+ *
+ * @param {string[]} names
+ * @param {string[]} types
+ * @param {(string | Buffer)} data
+ * @param {boolean} useNumberedParams
+ * @param {Result} values
+ * @returns {Result}
+ */
 function decodeParams(names, types, data) {
   var useNumberedParams = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : true;
   var values = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : new Result();
@@ -5887,6 +5975,8 @@ function decodeParams(names, types, data) {
     types = names;
     names = [];
   }
+
+  console.log(types, data.toString("hex"));
 
   data = utils.hexOrBuffer(data);
 
@@ -5917,14 +6007,14 @@ function decodeParams(names, types, data) {
 // create an encoded method signature from an ABI object
 function encodeSignature(method) {
   var signature = method.name + '(' + utils.getKeys(method.inputs, 'type').join(',') + ')';
-  var signatureEncoded = '0x' + new Buffer(utils.keccak256(signature), 'hex').slice(0, 4).toString('hex');
+  var signatureEncoded = utils.keccak256(signature).slice(0, 8);
 
-  return signatureEncoded;
+  return hexstr(signatureEncoded);
 }
 
 // encode method ABI object with values in an array, output bytecode
 function encodeMethod(method, values) {
-  var paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values).substring(2);
+  var paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values, true);
 
   return '' + encodeSignature(method) + paramsEncoded;
 }
@@ -5945,7 +6035,7 @@ function encodeEvent(eventObject, values) {
 function eventSignature(eventObject) {
   var signature = eventObject.name + '(' + utils.getKeys(eventObject.inputs, 'type').join(',') + ')';
 
-  return '0x' + utils.keccak256(signature);
+  return hexstr(utils.keccak256(signature));
 }
 
 // decode method data bytecode, from method ABI object
@@ -5964,13 +6054,12 @@ function decodeEvent(eventObject, data, topics) {
     // FIXME: special handling for string and bytes
 
     if (input.indexed) {
-      var topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
+      var topic = hexStringToBuffer(topics[i + topicOffset]);
       var coder = getParamCoder(input.type);
       event[input.name] = coder.decode(topic, 0).value;
     }
 
     if (useNumberedParams) {
-      // console.log("define", i, )
       Object.defineProperty(event, i, {
         enumerable: false,
         value: event[input.name]
@@ -5979,9 +6068,6 @@ function decodeEvent(eventObject, data, topics) {
   });
 
   event.type = eventObject.name;
-  // Object.defineProperty(event, 0, {
-  //   value: event.type,
-  // })
 
   return event;
 }
@@ -6026,9 +6112,9 @@ module.exports = {
   decodeLogItem: decodeLogItem,
   logDecoder: logDecoder,
   eventSignature: eventSignature,
-  encodeSignature: encodeSignature
+  encodeSignature: encodeSignature,
+  configure: configure
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ },
 /* 5 */
