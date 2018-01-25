@@ -399,6 +399,7 @@ module.exports = {
   hexOrBuffer,
   hexlify,
   stripZeros,
+  hexStringToBuffer,
 
   keccak256,
 

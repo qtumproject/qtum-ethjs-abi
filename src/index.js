@@ -9,6 +9,7 @@ Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 
 const Buffer = require('buffer').Buffer;
 const utils = require('./utils/index.js');
+const hexStringToBuffer = utils.hexStringToBuffer
 const uint256Coder = utils.uint256Coder;
 const coderBoolean = utils.coderBoolean;
 const coderFixedBytes = utils.coderFixedBytes;
@@ -93,7 +94,7 @@ class Result {
  * @param {Array<string>} types
  * @param {any[]} values
  */
-function encodeParams(types, values) {
+function encodeParams(types, values, noHexPrefix = false) {
   if (types.length !== values.length) {
     throw new Error(`[ethjs-abi] while encoding params, types/values mismatch, Your contract requires ${types.length} types (arguments), and you passed in ${values.length}`);
   }
@@ -135,7 +136,11 @@ function encodeParams(types, values) {
     }
   });
 
-  return hexstr(data);
+  if (noHexPrefix) {
+    return toHexStringNoPrefix(data);
+  } else {
+    return hexstr(data);
+  }
 }
 
 /**
@@ -155,6 +160,8 @@ function decodeParams(names, types, data, useNumberedParams = true, values = new
     types = names;
     names = [];
   }
+
+  console.log(types, data.toString("hex"));
 
   data = utils.hexOrBuffer(data);
 
@@ -185,14 +192,14 @@ function decodeParams(names, types, data, useNumberedParams = true, values = new
 // create an encoded method signature from an ABI object
 function encodeSignature(method) {
   const signature = `${method.name}(${utils.getKeys(method.inputs, 'type').join(',')})`;
-  const signatureEncoded = new Buffer(utils.keccak256(signature), 'hex').slice(0, 4);
+  const signatureEncoded = utils.keccak256(signature).slice(0, 8)
 
   return hexstr(signatureEncoded);
 }
 
 // encode method ABI object with values in an array, output bytecode
 function encodeMethod(method, values) {
-  const paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values).substring(2);
+  const paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values, true);
 
   return `${encodeSignature(method)}${paramsEncoded}`;
 }
@@ -231,7 +238,7 @@ function decodeEvent(eventObject, data, topics, useNumberedParams = true) {
     // FIXME: special handling for string and bytes
 
     if (input.indexed) {
-      const topic = new Buffer(topics[i + topicOffset].slice(2), 'hex');
+      const topic = hexStringToBuffer(topics[i + topicOffset]);
       const coder = getParamCoder(input.type);
       event[input.name] = coder.decode(topic, 0).value;
     }
@@ -280,5 +287,6 @@ module.exports = {
   decodeLogItem,
   logDecoder,
   eventSignature,
-  encodeSignature
+  encodeSignature,
+  configure,
 };
