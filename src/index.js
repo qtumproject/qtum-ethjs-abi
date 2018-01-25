@@ -7,6 +7,7 @@ https://github.com/ethers-io
 Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 */
 
+const Buffer = require('buffer').Buffer;
 const utils = require('./utils/index.js');
 const uint256Coder = utils.uint256Coder;
 const coderBoolean = utils.coderBoolean;
@@ -17,6 +18,45 @@ const coderString = utils.coderString;
 const coderArray = utils.coderArray;
 const paramTypePart = utils.paramTypePart;
 const getParamCoder = utils.getParamCoder;
+
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringNoPrefix(data) {
+  if (typeof data === "string") {
+    return data;
+  } else {
+    return data.toString('hex');
+  }
+}
+
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringPrefixed(data) {
+  if (typeof data === "string") {
+    return '0x' + data;
+  } else {
+    return '0x' + data.toString('hex');
+  }
+}
+
+let hexstr = toHexStringPrefixed;
+
+/**
+ *
+ * @param {Object} opts ABI encoding options
+ * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
+ */
+function configure(opts) {
+  if (opts.noHexStringPrefix) {
+    hexstr = toHexStringNoPrefix;
+  }
+}
 
 // function Result() { }
 class Result {
@@ -49,6 +89,10 @@ class Result {
   }
 }
 
+/**
+ * @param {Array<string>} types
+ * @param {any[]} values
+ */
 function encodeParams(types, values) {
   if (types.length !== values.length) {
     throw new Error(`[ethjs-abi] while encoding params, types/values mismatch, Your contract requires ${types.length} types (arguments), and you passed in ${values.length}`);
@@ -76,7 +120,7 @@ function encodeParams(types, values) {
   });
 
   var offset = 0, dynamicOffset = staticSize;
-  var data = new Buffer(staticSize + dynamicSize);
+  const data = new Buffer(staticSize + dynamicSize);
 
   parts.forEach(function (part, index) {
     if (part.dynamic) {
@@ -91,10 +135,19 @@ function encodeParams(types, values) {
     }
   });
 
-  return '0x' + data.toString('hex');
+  return hexstr(data);
 }
 
-// decode bytecode data from output names and types
+/**
+ * Decode bytecode data from output names and types
+ *
+ * @param {string[]} names
+ * @param {string[]} types
+ * @param {(string | Buffer)} data
+ * @param {boolean} useNumberedParams
+ * @param {Result} values
+ * @returns {Result}
+ */
 function decodeParams(names, types, data, useNumberedParams = true, values = new Result()) {
   // Names is optional, so shift over all the parameters if not provided
   if (arguments.length < 3) {
@@ -132,9 +185,9 @@ function decodeParams(names, types, data, useNumberedParams = true, values = new
 // create an encoded method signature from an ABI object
 function encodeSignature(method) {
   const signature = `${method.name}(${utils.getKeys(method.inputs, 'type').join(',')})`;
-  const signatureEncoded = `0x${(new Buffer(utils.keccak256(signature), 'hex')).slice(0, 4).toString('hex')}`;
+  const signatureEncoded = new Buffer(utils.keccak256(signature), 'hex').slice(0, 4);
 
-  return signatureEncoded;
+  return hexstr(signatureEncoded);
 }
 
 // encode method ABI object with values in an array, output bytecode
@@ -160,7 +213,7 @@ function encodeEvent(eventObject, values) {
 function eventSignature(eventObject) {
   const signature = `${eventObject.name}(${utils.getKeys(eventObject.inputs, 'type').join(',')})`;
 
-  return `0x${utils.keccak256(signature)}`;
+  return hexstr(utils.keccak256(signature));
 }
 
 // decode method data bytecode, from method ABI object
@@ -184,7 +237,6 @@ function decodeEvent(eventObject, data, topics, useNumberedParams = true) {
     }
 
     if (useNumberedParams) {
-      // console.log("define", i, )
       Object.defineProperty(event, i, {
         enumerable: false,
         value: event[input.name],
@@ -193,9 +245,6 @@ function decodeEvent(eventObject, data, topics, useNumberedParams = true) {
   });
 
   event.type = eventObject.name;
-  // Object.defineProperty(event, 0, {
-  //   value: event.type,
-  // })
 
   return event;
 }

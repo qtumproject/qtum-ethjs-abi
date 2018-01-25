@@ -6,6 +6,7 @@ https://github.com/ethers-io
 Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 */
 
+const Buffer = require('buffer').Buffer;
 const BN = require('bn.js');
 const numberToBN = require('number-to-bn');
 const keccak256 = require('js-sha3').keccak_256;
@@ -28,34 +29,61 @@ function bnToBuffer(bnInput) {
   return stripZeros(new Buffer(hex, 'hex'));
 }
 
-function isHexString(value, length) {
-  if (typeof(value) !== 'string' || !value.match(/^0x[0-9A-Fa-f]*$/)) {
-    return false;
-  }
-  if (length && value.length !== 2 + 2 * length) { return false; }
-  return true;
+/**
+ * Check if a string is hexadecimal data
+ *
+ * @param {string} value
+ * @param {number} size
+ */
+function isHexString(value, size) {
+  return hexStringToBuffer(value).length === size;
 }
 
-function hexOrBuffer(valueInput, name) {
-  var value = valueInput; // eslint-disable-line
-  if (!Buffer.isBuffer(value)) {
-    if (!isHexString(value)) {
-      const error = new Error(name ? (`[ethjs-abi] invalid ${name}`) : '[ethjs-abi] invalid hex or buffer, must be a prefixed alphanumeric even length hex string');
-      error.reason = '[ethjs-abi] invalid hex string, hex must be prefixed and alphanumeric (e.g. 0x023..)';
-      error.value = value;
-      throw error;
-    }
+/**
+ * Convert hexadecimal string to a buffer. The '0x' prefix is optional.
+ * @param {string} value
+ * @param {number} size The expected buffer size
+ * @param {string} msg optional error message
+ */
+function hexStringToBuffer(value, size = null, msg = null) {
+  if (typeof (value) !== 'string' || !value.match(/^(0x)?[0-9A-Fa-f]*$/)) {
+    const err = new Error(msg || '[ethjs-abi] invalid hex string');
+    err.value = value;
+    throw err;
+  }
 
-    value = value.substring(2);
-    if (value.length % 2) { value = `0${value}`; }
-    value = new Buffer(value, 'hex');
+  // massage the hex string before conversion to Buffer
+  let data = value;
+  if (data[0] === '0' && data[1] === 'x') {
+    data = data.slice(2);
+  }
+
+  if (data.length % 2 !== 0) {
+    data = `0${data}`;
+  }
+
+  if (size && data.length !== size * 2) {
+    throw new Error(msg || `[ethjs-abi] Expects a ${size} bytes hex string`);
+  }
+
+  return new Buffer(data, 'hex');
+}
+
+/**
+ * Convert string to Buffer
+ * @param {(Buffer|string)} valueInput
+ * @returns {Buffer}
+ */
+function hexOrBuffer(value) {
+  if (typeof value === 'string') {
+    return hexStringToBuffer(value);
   }
 
   return value;
 }
 
 function hexlify(value) {
-  if (typeof(value) === 'number') {
+  if (typeof (value) === 'number') {
     return `0x${bnToBuffer(new BN(value)).toString('hex')}`;
   } else if (value.mod || value.modulo) {
     return `0x${bnToBuffer(value).toString('hex')}`;
@@ -74,7 +102,7 @@ function getKeys(params, key, allowEmpty) {
     var value = params[i][key];  // eslint-disable-line
     if (allowEmpty && !value) {
       value = '';
-    } else if (typeof(value) !== 'string') {
+    } else if (typeof (value) !== 'string') {
       throw new Error('[ethjs-abi] while getKeys found invalid ABI data structure, type value not string');
     }
     result.push(value);
@@ -160,11 +188,9 @@ function coderFixedBytes(length) {
 }
 
 const coderAddress = {
-  encode: function encodeAddress(valueInput) {
-    var value = valueInput; // eslint-disable-line
-    var result = new Buffer(32); // eslint-disable-line
-    if (!isHexString(value, 20)) { throw new Error('[ethjs-abi] while encoding address, invalid address value, not alphanumeric 20 byte hex string'); }
-    value = hexOrBuffer(value);
+  encode: function encodeAddress(input) {
+    const result = new Buffer(32);
+    const value = hexStringToBuffer(input, 20, '[ethjs-abi] while encoding invalid address; not alphanumeric 20 byte hex string');
     result.fill(0);
     value.copy(result, 12);
     return result;
@@ -295,6 +321,10 @@ function coderArray(coder, lengthInput) {
 // build the coder up from its parts
 const paramTypePart = new RegExp(/^((u?int|bytes)([0-9]*)|(address|bool|string)|(\[([0-9]*)\]))/);
 
+/**
+ *
+ * @param {string} typeInput
+ */
 function getParamCoder(typeInput) {
   var type = typeInput; // eslint-disable-line
   var coder = null; // eslint-disable-line

@@ -148,7 +148,7 @@ describe('test utilty methods', () => {
     });
 
     it('invalid hex', () => {
-      assert.throws(() => utils.hexlify([]), Error);
+      assert.throws(() => utils.hexlify('0xzzaf'), Error);
     });
   });
 });
