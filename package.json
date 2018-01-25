@@ -213,5 +213,6 @@
         "as-needed"
       ]
     }
-  }
+  },
+  "pre-commit": "test"
 }
