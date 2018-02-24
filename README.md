@@ -4,7 +4,7 @@ Forked from https://github.com/ethjs/ethjs-abi
 
 Differences:
 
-* Accept hex string with our without "0x" as input.
+* Accept hex string with or without "0x" as input.
 * Configurable option to output hex string with or without "0x" prefix.
 * Add `Buffer` browser polyfill.
 
