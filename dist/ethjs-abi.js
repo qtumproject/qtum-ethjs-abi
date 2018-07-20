@@ -5342,6 +5342,59 @@ var BN = __webpack_require__(1);
 var numberToBN = __webpack_require__(10);
 var keccak256 = __webpack_require__(9).keccak_256;
 
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringNoPrefix(data) {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  return data.toString('hex');
+}
+
+/**
+ * Convert Buffer to hex string, prefixed with `0x`
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexStringPrefixed(data) {
+  if (typeof data === 'string') {
+    return '0x' + data;
+  }
+
+  return '0x' + data.toString('hex');
+}
+
+var noHexStringPrefix = false;
+/**
+ * Convert Buffer to hex string
+ * @param {(Buffer | string)} data
+ * @returns {string} data in hexadecimal string
+ */
+function toHexString(data) {
+  var no0xPrefix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : noHexStringPrefix;
+
+  if (no0xPrefix) {
+    return toHexStringNoPrefix(data);
+  }
+
+  return toHexStringPrefixed(data);
+}
+
+/**
+ *
+ * @param {Object} opts ABI encoding options
+ * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
+ */
+function configure(opts) {
+  if (opts.noHexStringPrefix) {
+    noHexStringPrefix = toHexStringNoPrefix;
+  }
+}
+
 // from ethereumjs-util
 function stripZeros(aInput) {
   var a = aInput; // eslint-disable-line
@@ -5516,14 +5569,14 @@ function coderFixedBytes(length) {
       value.copy(result);
       return result;
     },
-    decode: function decodeFixedBytes(data, offset) {
+    decode: function decodeFixedBytes(data, offset, no0xPrefix) {
       if (data.length !== 0 && data.length < offset + 32) {
         throw new Error('[ethjs-abi] while decoding fixed bytes, invalid bytes data length: ' + length);
       }
 
       return {
         consumed: 32,
-        value: '0x' + data.slice(offset, offset + length).toString('hex')
+        value: toHexString(data.slice(offset, offset + length), no0xPrefix)
       };
     }
   };
@@ -5537,11 +5590,11 @@ var coderAddress = {
     value.copy(result, 12);
     return result;
   },
-  decode: function decodeAddress(data, offset) {
+  decode: function decodeAddress(data, offset, no0xPrefix) {
     if (data.length === 0) {
       return {
         consumed: 32,
-        value: '0x'
+        value: toHexString(new Buffer(''), no0xPrefix)
       };
     }
     if (data.length !== 0 && data.length < offset + 32) {
@@ -5549,7 +5602,7 @@ var coderAddress = {
     }
     return {
       consumed: 32,
-      value: '0x' + data.slice(offset + 12, offset + 32).toString('hex')
+      value: toHexString(data.slice(offset + 12, offset + 32).toString('hex'), no0xPrefix)
     };
   }
 };
@@ -5583,9 +5636,9 @@ var coderDynamicBytes = {
   encode: function encodeDynamicBytes(value) {
     return encodeDynamicBytesHelper(hexOrBuffer(value));
   },
-  decode: function decodeDynamicBytes(data, offset) {
+  decode: function decodeDynamicBytes(data, offset, no0xPrefix) {
     var result = decodeDynamicBytesHelper(data, offset); // eslint-disable-line
-    result.value = '0x' + result.value.toString('hex');
+    result.value = toHexString(result.value, no0xPrefix);
     return result;
   },
   dynamic: true
@@ -5778,7 +5831,9 @@ module.exports = {
   coderString: coderString,
   coderArray: coderArray,
   paramTypePart: paramTypePart,
-  getParamCoder: getParamCoder
+  getParamCoder: getParamCoder,
+  configure: configure,
+  toHexString: toHexString
 };
 
 /***/ },
@@ -5805,7 +5860,6 @@ Note, Richard is a god of ether gods. Follow and respect him, and use Ethers.io!
 
 var Buffer = __webpack_require__(0).Buffer;
 var utils = __webpack_require__(3);
-var hexStringToBuffer = utils.hexStringToBuffer;
 var uint256Coder = utils.uint256Coder;
 var coderBoolean = utils.coderBoolean;
 var coderFixedBytes = utils.coderFixedBytes;
@@ -5816,44 +5870,9 @@ var coderArray = utils.coderArray;
 var paramTypePart = utils.paramTypePart;
 var getParamCoder = utils.getParamCoder;
 
-/**
- * Convert Buffer to hex string
- * @param {(Buffer | string)} data
- * @returns {string} data in hexadecimal string
- */
-function toHexStringNoPrefix(data) {
-  if (typeof data === "string") {
-    return data;
-  } else {
-    return data.toString('hex');
-  }
-}
-
-/**
- * Convert Buffer to hex string
- * @param {(Buffer | string)} data
- * @returns {string} data in hexadecimal string
- */
-function toHexStringPrefixed(data) {
-  if (typeof data === "string") {
-    return '0x' + data;
-  } else {
-    return '0x' + data.toString('hex');
-  }
-}
-
-var hexstr = toHexStringPrefixed;
-
-/**
- *
- * @param {Object} opts ABI encoding options
- * @param {boolean} opts.noHexStringPrefix Disable 0x prefix when outputing hexadecimal string
- */
-function configure(opts) {
-  if (opts.noHexStringPrefix) {
-    hexstr = toHexStringNoPrefix;
-  }
-}
+var hexStringToBuffer = utils.hexStringToBuffer,
+    toHexString = utils.toHexString,
+    configure = utils.configure;
 
 // function Result() { }
 
@@ -5900,11 +5919,10 @@ var Result = function () {
 /**
  * @param {Array<string>} types
  * @param {any[]} values
+ * @param {boolean} no0xPrefix
  */
 
-function encodeParams(types, values) {
-  var noHexPrefix = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
-
+function encodeParams(types, values, no0xPrefix) {
   if (types.length !== values.length) {
     throw new Error('[ethjs-abi] while encoding params, types/values mismatch, Your contract requires ' + types.length + ' types (arguments), and you passed in ' + values.length);
   }
@@ -5948,11 +5966,7 @@ function encodeParams(types, values) {
     }
   });
 
-  if (noHexPrefix) {
-    return toHexStringNoPrefix(data);
-  } else {
-    return hexstr(data);
-  }
+  return toHexString(data, no0xPrefix);
 }
 
 /**
@@ -5963,11 +5977,13 @@ function encodeParams(types, values) {
  * @param {(string | Buffer)} data
  * @param {boolean} useNumberedParams
  * @param {Result} values
+ * @param {boolean} no0xPrefix
  * @returns {Result}
  */
 function decodeParams(names, types, data) {
   var useNumberedParams = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : true;
   var values = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : new Result();
+  var no0xPrefix = arguments[5];
 
   // Names is optional, so shift over all the parameters if not provided
   if (arguments.length < 3) {
@@ -5975,8 +5991,6 @@ function decodeParams(names, types, data) {
     types = names;
     names = [];
   }
-
-  console.log(types, data.toString("hex"));
 
   data = utils.hexOrBuffer(data);
 
@@ -5986,10 +6000,10 @@ function decodeParams(names, types, data) {
 
     if (coder.dynamic) {
       var dynamicOffset = uint256Coder.decode(data, offset);
-      var result = coder.decode(data, dynamicOffset.value.toNumber());
+      var result = coder.decode(data, dynamicOffset.value.toNumber(), no0xPrefix);
       offset += dynamicOffset.consumed;
     } else {
-      var result = coder.decode(data, offset);
+      var result = coder.decode(data, offset, no0xPrefix);
       offset += result.consumed;
     }
 
@@ -6005,49 +6019,54 @@ function decodeParams(names, types, data) {
 }
 
 // create an encoded method signature from an ABI object
-function encodeSignature(method) {
+function encodeSignature(method, no0xPrefix) {
   var signature = method.name + '(' + utils.getKeys(method.inputs, 'type').join(',') + ')';
   var signatureEncoded = utils.keccak256(signature).slice(0, 8);
 
-  return hexstr(signatureEncoded);
+  return toHexString(signatureEncoded, no0xPrefix);
 }
 
 // encode method ABI object with values in an array, output bytecode
-function encodeMethod(method, values) {
-  var paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values, true);
+function encodeMethod(method, values, no0xPrefix) {
+  var paramsEncoded = encodeParams(utils.getKeys(method.inputs, 'type'), values, no0xPrefix);
 
-  return '' + encodeSignature(method) + paramsEncoded;
+  if (paramsEncoded[0] === '0' && paramsEncoded[1] === 'x') {
+    paramsEncoded = paramsEncoded.slice(2);
+  }
+
+  return '' + encodeSignature(method, no0xPrefix) + paramsEncoded;
 }
 
 // decode method data bytecode, from method ABI object
-function decodeMethod(method, data) {
+function decodeMethod(method, data, no0xPrefix) {
   var outputNames = utils.getKeys(method.outputs, 'name', true);
   var outputTypes = utils.getKeys(method.outputs, 'type');
 
-  return decodeParams(outputNames, outputTypes, utils.hexOrBuffer(data));
+  return decodeParams(outputNames, outputTypes, utils.hexOrBuffer(data), undefined, undefined, no0xPrefix);
 }
 
 // decode method data bytecode, from method ABI object
-function encodeEvent(eventObject, values) {
-  return encodeMethod(eventObject, values);
+function encodeEvent(eventObject, values, no0xPrefix) {
+  return encodeMethod(eventObject, values, no0xPrefix);
 }
 
-function eventSignature(eventObject) {
+function eventSignature(eventObject, no0xPrefix) {
   var signature = eventObject.name + '(' + utils.getKeys(eventObject.inputs, 'type').join(',') + ')';
 
-  return hexstr(utils.keccak256(signature));
+  return toHexString(utils.keccak256(signature), no0xPrefix);
 }
 
 // decode method data bytecode, from method ABI object
 function decodeEvent(eventObject, data, topics) {
   var useNumberedParams = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : true;
+  var no0xPrefix = arguments[4];
 
   var nonIndexed = eventObject.inputs.filter(function (input) {
     return !input.indexed;
   });
   var nonIndexedNames = utils.getKeys(nonIndexed, 'name', true);
   var nonIndexedTypes = utils.getKeys(nonIndexed, 'type');
-  var event = decodeParams(nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), false, new Result(eventObject.inputs.length));
+  var event = decodeParams(nonIndexedNames, nonIndexedTypes, utils.hexOrBuffer(data), false, new Result(eventObject.inputs.length), no0xPrefix);
   var topicOffset = eventObject.anonymous ? 0 : 1;
 
   eventObject.inputs.map(function (input, i) {
@@ -6056,7 +6075,7 @@ function decodeEvent(eventObject, data, topics) {
     if (input.indexed) {
       var topic = hexStringToBuffer(topics[i + topicOffset]);
       var coder = getParamCoder(input.type);
-      event[input.name] = coder.decode(topic, 0).value;
+      event[input.name] = coder.decode(topic, 0, no0xPrefix).value;
     }
 
     if (useNumberedParams) {
@@ -6075,9 +6094,10 @@ function decodeEvent(eventObject, data, topics) {
 // Decode a specific log item with a specific event abi
 function decodeLogItem(eventObject, log) {
   var useNumberedParams = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+  var no0xPrefix = arguments[3];
 
-  if (eventObject && log.topics[0] === eventSignature(eventObject)) {
-    return decodeEvent(eventObject, log.data, log.topics, useNumberedParams);
+  if (eventObject && log.topics[0] === eventSignature(eventObject, no0xPrefix)) {
+    return decodeEvent(eventObject, log.data, log.topics, useNumberedParams, no0xPrefix);
   }
 }
 
@@ -6086,16 +6106,17 @@ function decodeLogItem(eventObject, log) {
 // any matching log entries
 function logDecoder(abi) {
   var useNumberedParams = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+  var no0xPrefix = arguments[2];
 
   var eventMap = {};
   abi.filter(function (item) {
     return item.type === 'event';
   }).map(function (item) {
-    eventMap[eventSignature(item)] = item;
+    eventMap[eventSignature(item, no0xPrefix)] = item;
   });
   return function (logItems) {
     return logItems.map(function (log) {
-      return decodeLogItem(eventMap[log.topics[0]], log, useNumberedParams);
+      return decodeLogItem(eventMap[log.topics[0]], log, useNumberedParams, no0xPrefix);
     }).filter(function (i) {
       return i;
     });

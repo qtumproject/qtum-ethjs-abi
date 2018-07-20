@@ -43,15 +43,13 @@ let noHexStringPrefix = false;
  * @param {(Buffer | string)} data
  * @returns {string} data in hexadecimal string
  */
-function toHexString(data) {
-  if (noHexStringPrefix) {
+function toHexString(data, no0xPrefix = noHexStringPrefix) {
+  if (no0xPrefix) {
     return toHexStringNoPrefix(data);
   }
 
   return toHexStringPrefixed(data);
 }
-
-
 
 /**
  *
@@ -229,12 +227,12 @@ function coderFixedBytes(length) {
       value.copy(result);
       return result;
     },
-    decode: function decodeFixedBytes(data, offset) {
+    decode: function decodeFixedBytes(data, offset, no0xPrefix) {
       if (data.length !== 0 && data.length < offset + 32) { throw new Error(`[ethjs-abi] while decoding fixed bytes, invalid bytes data length: ${length}`); }
 
       return {
         consumed: 32,
-        value: toHexString(data.slice(offset, offset + length)),
+        value: toHexString(data.slice(offset, offset + length), no0xPrefix),
       };
     },
   };
@@ -248,17 +246,17 @@ const coderAddress = {
     value.copy(result, 12);
     return result;
   },
-  decode: function decodeAddress(data, offset) {
+  decode: function decodeAddress(data, offset, no0xPrefix) {
     if (data.length === 0) {
       return {
         consumed: 32,
-        value: toHexString(new Buffer('')),
+        value: toHexString(new Buffer(''), no0xPrefix),
       };
     }
     if (data.length !== 0 && data.length < offset + 32) { throw new Error(`[ethjs-abi] while decoding address data, invalid address data, invalid byte length ${data.length}`); }
     return {
       consumed: 32,
-      value: toHexString(data.slice(offset + 12, offset + 32).toString('hex')),
+      value: toHexString(data.slice(offset + 12, offset + 32).toString('hex'), no0xPrefix),
     };
   },
 };
@@ -292,9 +290,9 @@ const coderDynamicBytes = {
   encode: function encodeDynamicBytes(value) {
     return encodeDynamicBytesHelper(hexOrBuffer(value));
   },
-  decode: function decodeDynamicBytes(data, offset) {
+  decode: function decodeDynamicBytes(data, offset, no0xPrefix) {
     var result = decodeDynamicBytesHelper(data, offset); // eslint-disable-line
-    result.value = toHexString(result.value);
+    result.value = toHexString(result.value, no0xPrefix);
     return result;
   },
   dynamic: true,
@@ -469,7 +467,5 @@ module.exports = {
   paramTypePart,
   getParamCoder,
   configure,
-  toHexStringNoPrefix,
-  toHexStringPrefixed,
   toHexString,
 };
