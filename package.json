@@ -33,7 +33,7 @@
     "ethers-wallet": "1.0.8",
     "eventsource-polyfill": "0.9.6",
     "json-loader": "0.5.4",
-    "mocha": "3.1.2"
+    "mocha": "^6.2.0"
   },
   "keywords": [
     "ethereum",
